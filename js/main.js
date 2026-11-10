@@ -9,6 +9,8 @@
   const isMobile = () => innerWidth < 860;
 
   gsap.registerPlugin(ScrollTrigger);
+  // en móvil la barra del navegador cambia la altura al hacer scroll: no recalculamos por eso (evita saltos)
+  ScrollTrigger.config({ ignoreMobileResize: true });
 
   /* ---------------- Smooth scroll ---------------- */
   let lenis = null;
@@ -18,14 +20,22 @@
     gsap.ticker.add((t) => lenis.raf(t * 1000));
     gsap.ticker.lagSmoothing(0);
   }
+  // Desplazamiento "cinematográfico": nunca saltamos de golpe, recorremos el camino
+  // para que las animaciones se reproduzcan aunque se use un enlace o botón.
+  const easeInOut = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  function glide(target, offset = 0, minDur = 1.2) {
+    const y = typeof target === 'number' ? target : target.getBoundingClientRect().top + scrollY + offset;
+    const dist = Math.abs(y - scrollY);
+    const duration = Math.min(5, Math.max(minDur, dist / 2400));
+    if (lenis) lenis.scrollTo(y, { duration, easing: easeInOut, force: true });
+    else scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' });
+  }
   $$('a[href^="#"]').forEach(a => a.addEventListener('click', (e) => {
     const id = a.getAttribute('href');
     if (id.length < 2) return;
     const el = $(id); if (!el) return;
     e.preventDefault();
-    // para secciones fijadas, saltamos un poco dentro para que se vean ya "abiertas"
-    const off = id === '#top' ? 0 : -52;
-    lenis ? lenis.scrollTo(el, { offset: off, duration: 1.6 }) : el.scrollIntoView({ behavior: 'smooth' });
+    glide(el, id === '#top' ? 0 : -52);
   }));
 
   /* ---------------- Stars ---------------- */
@@ -79,23 +89,70 @@
     .to('#sunRays line', { strokeDashoffset: 0, duration: 1.1, stagger: { each: .05, from: 'center' } }, '-=.8')
     .from('.hero__word', { opacity: 0, y: 30, filter: 'invert(1) blur(12px)', duration: 1.2 }, '-=.9')
     .from('.hero__tag', { opacity: 0, y: 20, duration: 1 }, '-=.8')
-    .from('.scroll-hint', { opacity: 0, duration: 1 }, '-=.5');
+    .fromTo('#cue', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 1, clearProps: 'transform' }, '-=.6');
 
   /* ---------------- Hero scroll ---------------- */
+  // La foto nace exactamente del cuenco del sol (se recalcula en cada resize)
+  const sunEl = $('#sun'), stage = $('.hero__stage');
+  // (los SVG no tienen offsetTop/offsetWidth: medimos con getBoundingClientRect.
+  //  El cuenco es el origen del escalado, así que su posición no cambia al crecer el sol)
+  const bowl = () => {
+    const r = sunEl.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const w = sunEl.clientWidth || r.width;
+    return { x: r.left - sr.left + r.width / 2, y: r.top - sr.top + r.height * 168 / 260, r: w * 30 / 400 };
+  };
+  const rMax = () => Math.hypot(stage.offsetWidth, stage.offsetHeight);
+  // iris.r: 0 = cerrado, 1 = llena el cuenco del sol, 2 = pantalla completa
+  const reveal = $('#heroReveal');
+  const iris = { r: 0 };
+  function drawIris() {
+    const b = bowl();
+    const rad = iris.r <= 1 ? b.r * iris.r : b.r + (rMax() - b.r) * (iris.r - 1);
+    reveal.style.clipPath = `circle(${rad.toFixed(1)}px at ${b.x}px ${b.y.toFixed(1)}px)`;
+  }
+  drawIris();
+  addEventListener('resize', drawIris);
+  const cue = $('#cue'), cueFill = $('#cueFill'), cueText = $('#cueText');
   const heroTl = gsap.timeline({
-    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom bottom', scrub: 1,
-      onToggle: (st) => { starsVisible = st.isActive || st.progress < 1; } }
+    scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom bottom', scrub: 1, invalidateOnRefresh: true,
+      onToggle: (st) => { starsVisible = st.isActive || st.progress < 1; },
+      onUpdate: (st) => {
+        cueFill.style.strokeDashoffset = 132 * (1 - st.progress);
+        cueText.textContent = st.progress > .62 ? 'Sigue bajando' : 'Desliza para descubrir';
+        cue.classList.toggle('is-hidden', st.progress > .96);
+      } }
   });
   heroTl
-    .to('#scrollHint', { opacity: 0, duration: .1 }, 0)
-    .to('#sunRays', { rotation: 30, svgOrigin: '200 168', duration: 1, ease: 'none' }, 0)
-    .to('#sun', { scale: 1.9, yPercent: -20, duration: .55, ease: 'power1.in' }, 0)
-    .to('.hero__glow', { scale: 1.8, opacity: 1, duration: .55 }, 0)
-    .to('#heroCopy', { opacity: 0, y: -80, filter: 'blur(8px)', duration: .3 }, 0.05)
-    .fromTo('#heroReveal', { clipPath: 'circle(0% at 50% 40%)' }, { clipPath: 'circle(80% at 50% 40%)', duration: .5, ease: 'power2.in' }, .2)
-    .fromTo('#heroReveal img', { scale: 1.4 }, { scale: 1, duration: .8, ease: 'power1.out' }, .2)
-    .fromTo('#heroRevealCopy > *', { opacity: 0, y: 50 }, { opacity: 1, y: 0, stagger: .06, duration: .2 }, .62)
+    .to('#sunRays', { rotation: 35, svgOrigin: '200 168', duration: 1, ease: 'none' }, 0)
+    .to('#sun', { scale: 1.7, transformOrigin: '50% 64.6%', duration: .5, ease: 'power1.in' }, 0)
+    .to('.hero__glow', { scale: 1.8, opacity: 1, duration: .5 }, 0)
+    .to('#heroCopy', { opacity: 0, y: 60, filter: 'blur(8px)', duration: .22 }, 0.02)
+    .fromTo(iris, { r: 0 }, { r: 1, duration: .12, ease: 'power2.out', onUpdate: drawIris }, .1)
+    .to(iris, { r: 2, duration: .42, ease: 'power3.in', onUpdate: drawIris }, .26)
+    .fromTo('#heroReveal img', { scale: 1.5 }, { scale: 1, duration: .75, ease: 'power1.out' }, .1)
+    .fromTo('#heroRevealCopy > *', { opacity: 0, y: 50 }, { opacity: 1, y: 0, stagger: .06, duration: .18 }, .64)
     .to({}, { duration: .2 });
+
+  // El indicador también es un botón: si lo pulsas, la escena se reproduce sola (no se salta)
+  cue.addEventListener('click', () => {
+    const st = heroTl.scrollTrigger;
+    // 1er toque: reproduce el amanecer y se detiene en "Lleva el sol contigo".
+    // 2º toque: continúa (pasando por el manifiesto) hasta la colección.
+    if (st.progress < .88) glide(st.start + (st.end - st.start) * .93, 0, 3.2);
+    else glide($('#piedras'), 0, 2.4);
+  });
+
+  // Si a los pocos segundos nadie ha hecho scroll, damos un pequeño empujón visual
+  let interacted = false;
+  addEventListener('scroll', () => { if (scrollY > 8) interacted = true; }, { passive: true });
+  function nudge() {
+    if (interacted || scrollY > 8 || document.hidden) return;
+    cue.classList.remove('is-nudge'); void cue.offsetWidth; cue.classList.add('is-nudge');
+    gsap.timeline()
+      .to('.hero__stage', { y: -22, duration: .45, ease: 'power2.out' })
+      .to('.hero__stage', { y: 0, duration: .9, ease: 'bounce.out' });
+  }
+  if (!reduce) setTimeout(() => { nudge(); const iv = setInterval(() => interacted ? clearInterval(iv) : nudge(), 5200); }, 3800);
 
   /* ---------------- Nav theme ---------------- */
   const nav = $('#nav');
@@ -105,9 +162,15 @@
     const dark = darkSections().some(el => { const r = el.getBoundingClientRect(); return r.top <= y && r.bottom >= y; });
     nav.classList.toggle('is-light', !dark);
   }
-  ScrollTrigger.addEventListener('refresh', navTheme);
-  (lenis ? lenis.on.bind(lenis, 'scroll') : (fn) => addEventListener('scroll', fn, { passive: true }))(navTheme);
-  navTheme();
+  const progressBar = $('#progress');
+  function onScroll() {
+    navTheme();
+    const max = document.documentElement.scrollHeight - innerHeight;
+    progressBar.style.transform = `scaleX(${max > 0 ? scrollY / max : 0})`;
+  }
+  ScrollTrigger.addEventListener('refresh', onScroll);
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
   /* ---------------- Manifesto word reveal ---------------- */
   const man = $('#manifesto');
@@ -138,7 +201,10 @@
       scrollTrigger: {
         trigger: stonesSec, pin: '.stones__pin', start: 'top top', end: () => '+=' + dist() * 1.1,
         scrub: 1, invalidateOnRefresh: true, anticipatePin: 1,
-        onUpdate: (st) => gsap.set('#stonesBar', { scaleX: st.progress })
+        onUpdate: (st) => {
+          gsap.set('#stonesBar', { scaleX: st.progress });
+          gsap.set('#stonesHint', { opacity: Math.max(0, .8 - st.progress * 7) });
+        }
       }
     });
     stonesST = tween.scrollTrigger;
