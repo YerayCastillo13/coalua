@@ -499,3 +499,25 @@ a { color: inherit; }
   .feat h3 { font-size: 16px; }
   .feat p { font-size: 13px; }
 }
+
+/* v4 · indicador en todas las escenas fijadas + luna en iPhone */
+.cue { transition: background .3s, opacity .45s var(--ease), visibility .45s, bottom .55s var(--ease); }
+.cue.is-raised { bottom: calc(max(4vh, 16px) + 92px + env(safe-area-inset-bottom)); }
+@media (max-width: 860px) {
+  .spot__facts { bottom: calc(185px + 4vh); }
+  .ritual__pin {
+    align-content: center; gap: 16px;
+    padding: calc(52px + 22px) 20px calc(96px + env(safe-area-inset-bottom));
+  }
+  .ritual__head .eyebrow { margin-bottom: 8px; }
+  .ritual__head .display { font-size: clamp(30px, 8.6vw, 40px); }
+  .moon { width: min(44vw, 22svh); }
+  .ritual__steps { height: 170px; }
+  .rstep h3 { font-size: clamp(46px, 13vw, 60px); margin: 4px 0 10px; }
+  .rstep p { font-size: 15px; }
+}
+@media (max-width: 860px) {
+  /* los datos crecen hacia arriba desde su línea base: nunca bajan hasta el indicador */
+  .spot__facts { bottom: calc(176px + 3vh); }
+  .spot__facts li { top: auto; bottom: 0; }
+}

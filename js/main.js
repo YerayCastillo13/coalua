@@ -115,12 +115,7 @@
   const cue = $('#cue'), cueFill = $('#cueFill'), cueText = $('#cueText');
   const heroTl = gsap.timeline({
     scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom bottom', scrub: 1, invalidateOnRefresh: true,
-      onToggle: (st) => { starsVisible = st.isActive || st.progress < 1; },
-      onUpdate: (st) => {
-        cueFill.style.strokeDashoffset = 132 * (1 - st.progress);
-        cueText.textContent = st.progress > .58 ? 'Sigue bajando' : 'Desliza para descubrir';
-        cue.classList.toggle('is-hidden', st.progress > .9);
-      } }
+      onToggle: (st) => { starsVisible = st.isActive || st.progress < 1; } }
   });
   heroTl
     .to('#sunRays', { rotation: 35, svgOrigin: '200 168', duration: 1, ease: 'none' }, 0)
@@ -136,13 +131,41 @@
     .fromTo('#heroFade', { opacity: 0 }, { opacity: 1, duration: .2, ease: 'power1.in' }, .96)
     .to('#heroReveal img', { scale: 1.08, duration: .2, ease: 'none' }, .96);
 
-  // El indicador también es un botón: si lo pulsas, la escena se reproduce sola (no se salta)
+  /* ---------------- Indicador de scroll por capítulos ----------------
+     Cada escena fijada (hero, citrino, luna) registra:
+       - state(p, t): texto del indicador y si se oculta o se eleva
+       - stops: puntos (en progreso 0–1) donde se detiene si se pulsa el indicador
+       - after(): a dónde ir cuando ya no quedan paradas
+     Así el indicador siempre dice qué hacer y, si se pulsa, reproduce la escena en vez de saltarla. */
+  const chapters = [];
+  let activeChapter = null;
+  const addChapter = (tl, cfg) => chapters.push({ tl, ...cfg });
+  function updateCue() {
+    const c = chapters.find(ch => { const st = ch.tl.scrollTrigger; return st && scrollY >= st.start - 2 && scrollY <= st.end - 2; });
+    activeChapter = c || null;
+    if (!c) { cue.classList.add('is-hidden'); return; }
+    const p = c.tl.scrollTrigger.progress, t = p * c.tl.duration();
+    const s = c.state(p, t);
+    cueFill.style.strokeDashoffset = 132 * (1 - p);
+    if (cueText.textContent !== s.text) cueText.textContent = s.text;
+    cue.setAttribute('aria-label', s.text);
+    cue.classList.toggle('is-hidden', !!s.hidden);
+    cue.classList.toggle('is-raised', !!s.raised);
+  }
+  addEventListener('scroll', updateCue, { passive: true });
+  ScrollTrigger.addEventListener('refresh', updateCue);
   cue.addEventListener('click', () => {
-    const st = heroTl.scrollTrigger;
-    // 1er toque: reproduce el amanecer y se detiene en "Lleva el sol contigo".
-    // 2º toque: continúa (pasando por el manifiesto) hasta la colección.
-    if (st.progress < .8) glide(st.start + (st.end - st.start) * .86, 0, 3.2);
-    else glide($('#piedras'), 0, 2.4);
+    const c = activeChapter; if (!c) return;
+    const st = c.tl.scrollTrigger, p = st.progress;
+    const next = c.stops.find(x => x > p + .02);
+    if (next != null) glide(st.start + (st.end - st.start) * next, 0, c.stopDur || 1.6);
+    else glide(c.after(), 0, 2.2);
+  });
+
+  // Hero: 1er toque reproduce el amanecer hasta "Lleva el sol contigo"; 2º continúa hasta la colección
+  addChapter(heroTl, {
+    stops: [.86], stopDur: 3.2, after: () => $('#piedras'),
+    state: (p) => ({ text: p > .58 ? 'Sigue bajando' : 'Desliza para descubrir', hidden: p > .9 })
   });
 
   // Si a los pocos segundos nadie ha hecho scroll, damos un pequeño empujón visual
@@ -256,6 +279,22 @@
   gsap.set('#spotBuy', { xPercent: -50, yPercent: 160, opacity: 0 });
   spot.to('#spotBuy', { yPercent: 0, opacity: 1, duration: .5, ease: 'back.out(1.4)' }, 1.5 + facts.length * 1.3 - .6)
       .to({}, { duration: .6 });
+  {
+    const D = spot.duration(), buyAt = 1.5 + facts.length * 1.3 - .6;
+    addChapter(spot, {
+      // paradas: cada dato del citrino a pantalla completa y, al final, la barra de compra
+      stops: [...facts.map((_, i) => (1.9 + i * 1.3) / D), (buyAt + .55) / D],
+      after: () => $('#card3d'),
+      state: (p, t) => {
+        if (t < 1.4) return { text: 'Desliza para conocer el citrino' };
+        if (t < buyAt - .05) {
+          const n = t >= 4.0 ? 3 : t >= 2.7 ? 2 : 1;
+          return { text: `Desliza · ${n} de ${facts.length}` };
+        }
+        return { text: 'Sigue bajando', raised: true };
+      }
+    });
+  }
 
   /* ---------------- Card flip ---------------- */
   gsap.timeline({ scrollTrigger: { trigger: '#card3d', start: 'top top', end: 'bottom bottom', scrub: 1 } })
@@ -347,6 +386,18 @@
     rit.fromTo(s, { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: .35 }, i * 1 + .1);
     if (i < steps.length - 1) rit.to(s, { opacity: 0, y: -50, duration: .3 }, i * 1 + .8);
   });
+  {
+    const D = rit.duration();
+    addChapter(rit, {
+      stops: steps.map((_, i) => (i + .5) / D),
+      after: () => $('.community'),
+      state: (p, t) => {
+        if (t > steps.length - .35) return { text: 'Sigue bajando' };
+        return { text: `Desliza · ${Math.min(steps.length, Math.floor(t) + 1)} de ${steps.length}` };
+      }
+    });
+  }
+  updateCue();
 
   /* ---------------- Quick view ---------------- */
   const modal = $('#modal');
