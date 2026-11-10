@@ -23,10 +23,10 @@
   // Desplazamiento "cinematográfico": nunca saltamos de golpe, recorremos el camino
   // para que las animaciones se reproduzcan aunque se use un enlace o botón.
   const easeInOut = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  function glide(target, offset = 0, minDur = 1.2) {
+  function glide(target, offset = 0, minDur = 1.2, maxDur = 5) {
     const y = typeof target === 'number' ? target : target.getBoundingClientRect().top + scrollY + offset;
     const dist = Math.abs(y - scrollY);
-    const duration = Math.min(5, Math.max(minDur, dist / 2400));
+    const duration = Math.min(maxDur, Math.max(minDur, dist / 2400));
     if (lenis) lenis.scrollTo(y, { duration, easing: easeInOut, force: true });
     else scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' });
   }
@@ -35,6 +35,7 @@
     if (id.length < 2) return;
     const el = $(id); if (!el) return;
     e.preventDefault();
+    if (a.closest('.menu')) return; // el menú gestiona sus propios enlaces (primero cierra, luego desplaza)
     glide(el, id === '#top' ? 0 : -52);
   }));
 
@@ -357,8 +358,10 @@
   });
   $('#filters').addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return;
-    $$('.chip').forEach(c => c.classList.toggle('is-active', c === b));
-    const f = b.dataset.filter;
+    setFilter(b.dataset.filter);
+  });
+  function setFilter(f) {
+    $$('.chip').forEach(c => c.classList.toggle('is-active', c.dataset.filter === f));
     const cards = $$('.card', grid);
     gsap.to(cards, {
       opacity: 0, y: 20, duration: .25, stagger: .02, onComplete: () => {
@@ -368,7 +371,7 @@
         ScrollTrigger.refresh();
       }
     });
-  });
+  }
   grid.addEventListener('click', (e) => {
     const m = e.target.closest('[data-qv]'); if (m) openQV(m.dataset.qv);
   });
@@ -462,7 +465,7 @@
   const closeDrawer = () => { drawer.classList.remove('is-open'); drawer.setAttribute('aria-hidden', 'true'); lenis && lenis.start(); };
   $('#bagBtn').addEventListener('click', openDrawer);
   drawer.addEventListener('click', (e) => { if (e.target.closest('[data-close-drawer]')) closeDrawer(); });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeQV(); closeDrawer(); } });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeQV(); closeDrawer(); closeMenu(); } });
 
   function flyToBag(from) {
     const a = from.getBoundingClientRect(), b = $('#bagBtn').getBoundingClientRect();
@@ -481,6 +484,88 @@
     clearTimeout(tt); tt = setTimeout(() => t.classList.remove('is-on'), 2200);
   }
   renderBag();
+
+  /* ---------------- Indicador del citrino: siempre por encima de la barra de compra ----------------
+     Se recoloca en cada fotograma (la barra entra con scrub suavizado), así nunca se tapan. */
+  const buyBar = $('#spotBuy');
+  gsap.ticker.add(() => {
+    if (!cue.classList.contains('is-raised')) { if (cue.style.bottom) cue.style.bottom = ''; return; }
+    const r = buyBar.getBoundingClientRect();
+    const base = parseFloat(getComputedStyle(cue).getPropertyValue('--cue-base')) || 22;
+    cue.style.bottom = Math.max(base, innerHeight - r.top + 14) + 'px';
+  });
+
+  /* ---------------- Volver arriba ---------------- */
+  const toTop = $('#toTop');
+  const pinnedNow = () => ['#hero', '#piedras', '#spot'].some(sel => {
+    const st = ScrollTrigger.getAll().find(t => t.trigger === $(sel));
+    return st && scrollY >= st.start - 4 && scrollY <= st.end + 4;
+  });
+  function updateToTop() {
+    const show = scrollY > innerHeight * 4 && !pinnedNow() && !menu.classList.contains('is-open');
+    toTop.classList.toggle('is-on', show);
+  }
+  addEventListener('scroll', updateToTop, { passive: true });
+  toTop.addEventListener('click', () => glide(0, 0, 1.2, 2.2));
+
+  /* ---------------- Menú de productos ---------------- */
+  const menu = $('#menu'), menuBtn = $('#menuBtn'), shopBtn = $('#shopBtn');
+  $('#menuStones').innerHTML = STONES.map(s =>
+    `<li><button type="button" data-menu-qv="${s.id}"><i style="background:${s.color}"></i>${s.name}<span>${eur(s.price)}</span></button></li>`).join('');
+  function openMenu() {
+    if (menu.classList.contains('is-open')) return;
+    menu.classList.add('is-open'); menu.setAttribute('aria-hidden', 'false');
+    nav.classList.add('is-menu');
+    menuBtn.setAttribute('aria-expanded', 'true'); shopBtn.setAttribute('aria-expanded', 'true');
+    menuBtn.setAttribute('aria-label', 'Cerrar menú');
+    if (isMobile() && lenis) lenis.stop();
+    gsap.fromTo('.menu__col > *', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: .5, stagger: .025, ease: 'power3.out', delay: .08, overwrite: true });
+    updateToTop();
+  }
+  function closeMenu() {
+    if (!menu.classList.contains('is-open')) return;
+    menu.classList.remove('is-open'); menu.setAttribute('aria-hidden', 'true');
+    nav.classList.remove('is-menu');
+    menuBtn.setAttribute('aria-expanded', 'false'); shopBtn.setAttribute('aria-expanded', 'false');
+    menuBtn.setAttribute('aria-label', 'Abrir menú');
+    lenis && lenis.start();
+    updateToTop();
+  }
+  menuBtn.addEventListener('click', () => menu.classList.contains('is-open') ? closeMenu() : openMenu());
+  shopBtn.addEventListener('click', () => menu.classList.contains('is-open') ? closeMenu() : openMenu());
+  // en escritorio se abre al pasar el ratón por "Tienda", como un desplegable
+  if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    let t;
+    const keep = () => clearTimeout(t);
+    const leave = () => { clearTimeout(t); t = setTimeout(closeMenu, 260); };
+    shopBtn.addEventListener('mouseenter', () => { keep(); openMenu(); });
+    shopBtn.addEventListener('mouseleave', leave);
+    $('.menu__panel').addEventListener('mouseenter', keep);
+    $('.menu__panel').addEventListener('mouseleave', leave);
+  }
+  menu.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close-menu]')) return closeMenu();
+    const f = e.target.closest('[data-filter-go]');
+    if (f) {
+      e.preventDefault(); setFilter(f.dataset.filterGo); closeMenu();
+      requestAnimationFrame(() => glide($('#tienda'), -52, 1, 1.4));
+      return;
+    }
+    const q = e.target.closest('[data-menu-qv]');
+    if (q) { closeMenu(); setTimeout(() => openQV(q.dataset.menuQv), 250); return; }
+    const soon = e.target.closest('[data-soon]');
+    if (soon) { toast(`${soon.dataset.soon}: muy pronto en la tienda ✨`); return; }
+    const link = e.target.closest('a[href^="#"]');
+    if (link) {
+      e.preventDefault();
+      closeMenu();
+      // lenis.start() (al cerrar) cancela cualquier desplazamiento en curso: desplazamos después
+      requestAnimationFrame(() => glide($(link.getAttribute('href')), -52, 1, 1.4));
+      return;
+    }
+    if (e.target.closest('a')) closeMenu();
+  });
+  addEventListener('resize', () => { if (!isMobile() && lenis) lenis.start(); });
 
   /* ---------------- Refresh after assets ---------------- */
   addEventListener('load', () => ScrollTrigger.refresh());

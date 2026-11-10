@@ -9,26 +9,62 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=10">
+<link rel="stylesheet" href="css/styles.css?v=13">
 </head>
 <body>
 
 <!-- ============ NAV ============ -->
 <header class="nav" id="nav">
   <div class="nav__inner">
-    <a href="#top" class="nav__logo" aria-label="Coalúa, inicio"><img src="assets/img/logo-word.png?v=10" alt="Coalúa"></a>
+    <a href="#top" class="nav__logo" aria-label="Coalúa, inicio"><img src="assets/img/logo-word.png?v=13" alt="Coalúa"></a>
     <nav class="nav__links" aria-label="Principal">
+      <button class="nav__shop" id="shopBtn" type="button" aria-expanded="false" aria-controls="menu">Tienda <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button>
       <a href="#piedras">Piedras</a>
-      <a href="#tienda">Tienda</a>
       <a href="#ritual">Rituales</a>
       <a href="#unboxing">Nosotras</a>
     </nav>
     <div class="nav__actions">
-      <button class="icon-btn" aria-label="Buscar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
       <button class="icon-btn bag-btn" id="bagBtn" aria-label="Abrir cesta"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><span class="bag-count" id="bagCount">0</span></button>
+      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="menu"><i></i><i></i></button>
     </div>
   </div>
 </header>
+
+<!-- ============ MENÚ DE PRODUCTOS (desplegable en escritorio, pantalla completa en móvil) ============ -->
+<div class="menu" id="menu" aria-hidden="true">
+  <div class="menu__backdrop" data-close-menu></div>
+  <div class="menu__panel" role="dialog" aria-label="Menú de la tienda">
+    <div class="menu__inner">
+      <div class="menu__col menu__col--main">
+        <span class="menu__label">Comprar</span>
+        <a class="menu__big" href="#tienda" data-filter-go="all">Pulseras <small>10</small></a>
+        <button class="menu__big is-soon" type="button" data-soon="Joyas">Joyas <em>Pronto</em></button>
+        <button class="menu__big is-soon" type="button" data-soon="Sahumerios">Sahumerios <em>Pronto</em></button>
+        <button class="menu__big is-soon" type="button" data-soon="Palo santo">Palo santo <em>Pronto</em></button>
+        <button class="menu__big is-soon" type="button" data-soon="Tarjetas regalo">Tarjeta regalo <em>Pronto</em></button>
+      </div>
+      <div class="menu__col">
+        <span class="menu__label">Pulseras por intención</span>
+        <a class="menu__link" href="#tienda" data-filter-go="Protección">Protección</a>
+        <a class="menu__link" href="#tienda" data-filter-go="Amor">Amor</a>
+        <a class="menu__link" href="#tienda" data-filter-go="Abundancia">Abundancia</a>
+        <a class="menu__link" href="#tienda" data-filter-go="Calma">Calma</a>
+      </div>
+      <div class="menu__col">
+        <span class="menu__label">Por piedra</span>
+        <ul class="menu__stones" id="menuStones"></ul>
+      </div>
+      <div class="menu__col">
+        <span class="menu__label">Descubre</span>
+        <a class="menu__link" href="#piedras">La colección</a>
+        <a class="menu__link" href="#spot">Piedra destacada</a>
+        <a class="menu__link" href="#ritual">El ritual</a>
+        <a class="menu__link" href="#unboxing">Nosotras</a>
+        <a class="menu__link" href="https://www.instagram.com/coalua_" target="_blank" rel="noopener">Instagram ↗</a>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="progress" aria-hidden="true"><span id="progress"></span></div>
 <div class="promo">Envío gratis a partir de 35 € · Tarjeta de intención incluida en cada pedido</div>
 
@@ -48,7 +84,7 @@
     </svg>
 
     <div class="hero__copy" id="heroCopy">
-      <img class="hero__word" src="assets/img/logo-word.png?v=10" alt="Coalúa">
+      <img class="hero__word" src="assets/img/logo-word.png?v=13" alt="Coalúa">
       <p class="hero__tag">Cristales, joyas y rituales<br><em>hechos a mano, con intención.</em></p>
     </div>
 
@@ -265,6 +301,8 @@
 
 <div class="toast" id="toast"></div>
 
+<button class="totop" id="toTop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+
 <!-- Scroll cue: invita a deslizar; si se pulsa, reproduce la escena en vez de saltarla -->
 <button class="cue" id="cue" type="button" aria-label="Desliza para descubrir">
   <span class="cue__ring" aria-hidden="true">
@@ -290,7 +328,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
-<script src="js/data.js?v=10"></script>
-<script src="js/main.js?v=10"></script>
+<script src="js/data.js?v=13"></script>
+<script src="js/main.js?v=13"></script>
 </body>
 </html>
