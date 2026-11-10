@@ -118,8 +118,8 @@
       onToggle: (st) => { starsVisible = st.isActive || st.progress < 1; },
       onUpdate: (st) => {
         cueFill.style.strokeDashoffset = 132 * (1 - st.progress);
-        cueText.textContent = st.progress > .62 ? 'Sigue bajando' : 'Desliza para descubrir';
-        cue.classList.toggle('is-hidden', st.progress > .96);
+        cueText.textContent = st.progress > .58 ? 'Sigue bajando' : 'Desliza para descubrir';
+        cue.classList.toggle('is-hidden', st.progress > .9);
       } }
   });
   heroTl
@@ -131,14 +131,17 @@
     .to(iris, { r: 2, duration: .42, ease: 'power3.in', onUpdate: drawIris }, .26)
     .fromTo('#heroReveal img', { scale: 1.5 }, { scale: 1, duration: .75, ease: 'power1.out' }, .1)
     .fromTo('#heroRevealCopy > *', { opacity: 0, y: 50 }, { opacity: 1, y: 0, stagger: .06, duration: .18 }, .64)
-    .to({}, { duration: .2 });
+    // salida suave: la escena se funde con el crema del manifiesto
+    .to('#heroRevealCopy', { opacity: 0, y: -40, duration: .14 }, .98)
+    .fromTo('#heroFade', { opacity: 0 }, { opacity: 1, duration: .2, ease: 'power1.in' }, .96)
+    .to('#heroReveal img', { scale: 1.08, duration: .2, ease: 'none' }, .96);
 
   // El indicador también es un botón: si lo pulsas, la escena se reproduce sola (no se salta)
   cue.addEventListener('click', () => {
     const st = heroTl.scrollTrigger;
     // 1er toque: reproduce el amanecer y se detiene en "Lleva el sol contigo".
     // 2º toque: continúa (pasando por el manifiesto) hasta la colección.
-    if (st.progress < .88) glide(st.start + (st.end - st.start) * .93, 0, 3.2);
+    if (st.progress < .8) glide(st.start + (st.end - st.start) * .86, 0, 3.2);
     else glide($('#piedras'), 0, 2.4);
   });
 
